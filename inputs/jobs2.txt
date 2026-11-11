@@ -1,0 +1,7 @@
+# jobs2.txt - every job arrives at time 0
+# job_id  arrival_time  burst_time
+P1  0  6
+P2  0  2
+P3  0  8
+P4  0  3
+P5  0  4

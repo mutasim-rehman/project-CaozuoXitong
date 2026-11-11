@@ -1,0 +1,14 @@
+# jobs4.txt - algorithms give very different results:
+# one long job arrives first, followed by many short ones.
+# Lines are deliberately NOT sorted by arrival time.
+# job_id  arrival_time  burst_time
+P5   4   2
+P1   0  12
+P3   2   1
+P10 10   3
+P2   1   2
+P8   8   5
+P4   3   3
+P7   7   1
+P6   6   4
+P9   9   2

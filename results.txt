@@ -1,0 +1,51 @@
+Mini CPU Scheduler - comparison tables (all mode, quantum 2)
+(regenerate on the lab machine with: make results)
+
+Comparison (inputs/jobs1.txt):
+Algorithm                 Avg waiting  Avg turnaround  Avg response  Context switches
+-------------------------------------------------------------------------------------
+FCFS                             3.33            8.67          3.33                 2
+SJF                              3.33            8.67          3.33                 2
+SRTF                             3.00            8.33          2.00                 3
+Round Robin (q = 2)              6.00           11.33          1.00                 7
+
+Comparison (inputs/jobs2.txt):
+Algorithm                 Avg waiting  Avg turnaround  Avg response  Context switches
+-------------------------------------------------------------------------------------
+FCFS                             9.80           14.40          9.80                 4
+SJF                              6.20           10.80          6.20                 4
+SRTF                             6.20           10.80          6.20                 4
+Round Robin (q = 2)             11.00           15.60          4.00                10
+
+Comparison (inputs/jobs3.txt):
+Algorithm                 Avg waiting  Avg turnaround  Avg response  Context switches
+-------------------------------------------------------------------------------------
+FCFS                             1.40            3.80          1.40                 3
+SJF                              1.40            3.80          1.40                 3
+SRTF                             1.00            3.40          0.80                 4
+Round Robin (q = 2)              1.40            3.80          0.80                 5
+
+Comparison (inputs/jobs4.txt):
+Algorithm                 Avg waiting  Avg turnaround  Avg response  Context switches
+-------------------------------------------------------------------------------------
+FCFS                            14.00           17.50         14.00                 9
+SJF                             12.20           15.70         12.20                 9
+SRTF                             5.10            8.60          2.70                11
+Round Robin (q = 2)             11.30           14.80          5.10                19
+
+Comparison (inputs/starve.txt):
+Algorithm                 Avg waiting  Avg turnaround  Avg response  Context switches
+-------------------------------------------------------------------------------------
+FCFS                             9.23           11.85          9.23                12
+SJF                              1.85            4.46          1.85                12
+SRTF                             1.85            4.46          1.85                12
+Round Robin (q = 2)              6.77            9.38          4.92                16
+
+Comparison (inputs/prio.txt):
+Algorithm                 Avg waiting  Avg turnaround  Avg response  Context switches
+-------------------------------------------------------------------------------------
+FCFS                            13.14           17.57         13.14                 6
+SJF                             10.14           14.57         10.14                 6
+SRTF                             8.00           12.43          4.71                 7
+Round Robin (q = 2)             16.57           21.00          4.71                16
+Priority                         8.57           13.00          6.86                 7

@@ -1,0 +1,12 @@
+# prio.txt - bonus: priority scheduling (smaller number = higher priority).
+# Run with "prio" (optionally "--aging N") or "all" to include the Priority row.
+# P5 has the lowest priority and is overtaken by everyone (response 22).
+# With --aging 4 its priority improves while it waits (response 12).
+# job_id  arrival_time  burst_time  priority
+P1  0  8  3
+P2  1  4  1
+P3  2  6  4
+P4  3  3  2
+P5  4  5  5
+P6  5  2  1
+P7  6  3  2

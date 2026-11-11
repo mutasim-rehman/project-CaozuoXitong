@@ -1,0 +1,18 @@
+# starve.txt - bonus: starvation demo.
+# A long job arrives at t=0 together with a steady stream of short jobs
+# (one every 2 units). Under SJF and SRTF the CPU is never free of a
+# shorter job until t=24, so LONG waits 24 units. Under FCFS it runs first.
+# job_id  arrival_time  burst_time
+LONG  0  10
+S01   0   2
+S02   2   2
+S03   4   2
+S04   6   2
+S05   8   2
+S06  10   2
+S07  12   2
+S08  14   2
+S09  16   2
+S10  18   2
+S11  20   2
+S12  22   2

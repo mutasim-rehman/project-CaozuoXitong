@@ -1,0 +1,7 @@
+# jobs3.txt - idle gap: P1 and P2 finish at t=5, CPU is IDLE until P3 arrives at t=9
+# job_id  arrival_time  burst_time
+P1   0  3
+P2   1  2
+P3   9  4
+P4  10  1
+P5  12  2
