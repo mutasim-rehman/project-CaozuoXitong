@@ -120,7 +120,8 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
   - Ties: earlier arrival first, then smaller job id (string compare).
   - Round Robin: jobs arriving at time t are enqueued before a job whose
     quantum expires at t. If the quantum expires and nobody is waiting, the
-    same job continues (no preemption, no context switch).
+    same job continues with a fresh quantum (no preemption, no context
+    switch); a job that arrives later waits for that quantum to end.
   - SRTF: checked at every time unit; equal remaining time -> running job
     continues. The same rule is used for equal priority in Priority mode.
   - Idle CPU is shown as IDLE in the Gantt chart.

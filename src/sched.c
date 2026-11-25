@@ -51,7 +51,6 @@ static void sleep_unit(void)
  * Only one sched_run() runs at a time, so globals are fine and simpler
  * than threading a context pointer through every signal handler.
  * ======================================================================== */
-
 static job_table_t     *g_tab;
 static sched_opts_t     g_opts;
 static sched_output_t  *g_out;
@@ -429,6 +428,11 @@ void sched_run(job_table_t *t, const sched_opts_t *opts, sched_output_t *out)
                     log_event(g_t, LOG_PREEMPTED, rj->id);
                     rq_push_tail(running_idx);
                     running_idx = -1;
+                    g_q_used = 0;
+                } else if (g_q_used >= g_opts.quantum) {
+                    /* Quantum expired but nobody is waiting: the job goes to
+                       the back of an empty queue and is picked again, so it
+                       starts a fresh quantum (no preemption, no switch). */
                     g_q_used = 0;
                 }
             } else if (alg_is_preemptive(g_opts.algo)) {
