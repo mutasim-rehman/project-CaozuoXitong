@@ -1,110 +1,111 @@
-/* common.h - shared types, constants and helpers for the Mini CPU Scheduler.
- *
- * Operating Systems Lab - Mini CPU Scheduler
- */
+// common.h - Shared structs and table printing for scheduler and report.
 
-#ifndef MINI_SCHED_COMMON_H
-#define MINI_SCHED_COMMON_H
+#ifndef COMMON_H
+#define COMMON_H
 
-#include <stddef.h>
+#include <cstring>
+#include <iomanip>
+#include <iostream>
+#include <string>
 
-/* ---------- limits and conventions ---------- */
+using namespace std;
 
-#define MAX_JOBS      64
-#define MAX_ID_LEN    16
-#define MAX_GANTT     8192
+const int MAX_JOBS   = 64;
+const int MAX_ID_LEN = 16;
+const int MAX_GANTT  = 4096;
+const int MAX_RUNS   = 4;
+
 #ifndef TIME_UNIT_MS
-#define TIME_UNIT_MS  200    /* one "time unit" of simulated CPU work */
+#define TIME_UNIT_MS 200   // 1 simulated time unit = 200 ms
 #endif
 
-/* POSIX IPC names used between the scheduler and the report program. */
-#define SHM_NAME   "/mini_sched_shm"
-#define SEM_NAME   "/mini_sched_ready"
+// POSIX shared memory and semaphore names (Part 6)
+#define SHM_NAME "/mini_sched_shm"
+#define SEM_NAME "/mini_sched_ready"
 
-/* ---------- algorithm identifiers ---------- */
-
-typedef enum {
-    ALG_FCFS = 0,
-    ALG_SJF  = 1,
-    ALG_SRTF = 2,
-    ALG_RR   = 3,
-    ALG_PRIO = 4,       /* bonus: preemptive priority (optionally with aging) */
-    ALG_COUNT
-} algo_t;
-
-/* Human-readable algorithm names (index by algo_t). */
-extern const char *ALGO_NAMES[ALG_COUNT];
-
-/* ---------- job table ---------- */
-
-typedef struct {
-    char id[MAX_ID_LEN];     /* job id as given in the input file           */
-    int  arrival;            /* arrival time, >= 0                          */
-    int  burst;              /* burst (total CPU requirement), >= 1         */
-    int  priority;           /* smaller = higher priority; 0 if unspecified */
-
-    /* mutable per-run state (reset between runs in "all" mode) */
-    int  remaining;          /* remaining CPU time, starts at burst         */
-    int  first_start;        /* -1 until the first CPU allocation           */
-    int  completion;         /* -1 until the job finishes                   */
-    int  wait_accum;         /* units waited since last on CPU (aging)      */
-    int  eff_priority;       /* priority after aging                        */
-    int  in_ready;           /* flag: job currently sitting in ready queue  */
-    int  finished;           /* flag: remaining == 0 and reported           */
-} job_t;
-
-typedef struct {
-    job_t jobs[MAX_JOBS];
-    int   n;                 /* number of jobs                              */
-    int   have_priority;     /* 1 if any input line had an explicit prio    */
-} job_table_t;
-
-/* ---------- Gantt chart entry (one per unit, then merged for printing) ---------- */
-
-typedef struct {
-    int t_start;             /* inclusive                                   */
-    int t_end;               /* exclusive                                   */
-    char id[MAX_ID_LEN];     /* job id, "IDLE", or "CS"                     */
-} gantt_seg_t;
-
-/* ---------- run results (used for comparison table and shared-memory report) ---------- */
-
-typedef struct {
+struct Job {
     char id[MAX_ID_LEN];
-    int  arrival;
-    int  burst;
-    int  priority;
-    int  completion;
-    int  turnaround;
-    int  waiting;
-    int  response;
-} job_metrics_t;
+    int  at;            // arrival time
+    int  bt;            // burst time
+    int  rem;           // remaining time
+    int  first_start;   // first time CPU was given (-1 if not started)
+    int  ct;            // completion time
+    bool arrived;       // true once pushed into ready queue
+};
 
-typedef struct {
-    algo_t algo;
-    int    quantum;              /* only meaningful for RR                  */
-    int    cs_cost;              /* bonus: idle units per context switch    */
-    int    n;
-    job_metrics_t m[MAX_JOBS];
-    double avg_waiting;
-    double avg_turnaround;
-    double avg_response;
-    int    context_switches;
-    int    total_time;           /* final simulated time                    */
-    int    valid;                /* 1 if the run actually ran               */
-} run_result_t;
+struct GanttEntry {
+    int  start;
+    int  end;
+    char label[MAX_ID_LEN];   // job id or "IDLE"
+};
 
-/* Shared memory layout for Part 6. */
-typedef struct {
-    int           n_runs;
-    int           aging;         /* bonus option, for labels only           */
-    char          input[128];    /* input file name, for the report header  */
-    run_result_t  runs[ALG_COUNT];
-} shm_report_t;
+// Plain structs (char arrays instead of std::string) so they fit in shared memory.
+struct JobMetric {
+    char id[MAX_ID_LEN];
+    int  at, bt, ct, tat, wt, rt;
+};
 
-/* ---------- small helpers ---------- */
+struct RunResult {
+    char      algo_name[32];  // e.g. "FCFS", "Round Robin (q = 2)"
+    int       n;
+    JobMetric m[MAX_JOBS];
+    double    avg_wt, avg_tat, avg_rt;
+    int       context_switches;
+    int       total_time;
+};
 
-void die(const char *fmt, ...);
-int  algo_from_string(const char *s, algo_t *out);
+struct SharedReport {
+    int       n_runs;
+    char      input_file[128];
+    RunResult runs[MAX_RUNS];
+};
 
-#endif /* MINI_SCHED_COMMON_H */
+// Logger functions (implemented in logger.cpp)
+void start_logger(const char* filename);
+void log_event(int t, const char* event_name, const char* job_id);
+void log_line(const string& text);
+void stop_logger();
+
+inline void print_job_table(const RunResult& r) {
+    cout << "\n"
+         << left  << setw(8)  << "Job"
+         << right << setw(8)  << "Arrival" << setw(6)  << "Burst"
+         << setw(11) << "Completion" << setw(11) << "Turnaround"
+         << setw(8)  << "Waiting"    << setw(9)  << "Response" << "\n"
+         << "-------------------------------------------------------------\n";
+
+    for (int i = 0; i < r.n; ++i) {
+        JobMetric m = r.m[i];
+        cout << left  << setw(8)  << m.id
+             << right << setw(8)  << m.at  << setw(6)  << m.bt
+             << setw(11) << m.ct  << setw(11) << m.tat
+             << setw(8)  << m.wt  << setw(9)  << m.rt << "\n";
+    }
+
+    cout << "-------------------------------------------------------------\n"
+         << fixed << setprecision(2)
+         << left  << setw(8)  << "Average"
+         << right << setw(25) << ""
+         << setw(11) << r.avg_tat << setw(8) << r.avg_wt << setw(9) << r.avg_rt << "\n"
+         << "Context switches: " << r.context_switches
+         << "   Total time: " << r.total_time << "\n";
+}
+
+inline void print_comparison(const RunResult runs[], int n_runs) {
+    cout << "\n"
+         << left  << setw(24) << "Algorithm"
+         << right << setw(13) << "Avg waiting" << setw(16) << "Avg turnaround"
+         << setw(14) << "Avg response" << setw(18) << "Context switches" << "\n"
+         << "-------------------------------------------------------------------------------------\n"
+         << fixed << setprecision(2);
+
+    for (int i = 0; i < n_runs; ++i) {
+        cout << left  << setw(24) << runs[i].algo_name
+             << right << setw(13) << runs[i].avg_wt
+             << setw(16) << runs[i].avg_tat
+             << setw(14) << runs[i].avg_rt
+             << setw(18) << runs[i].context_switches << "\n";
+    }
+}
+
+#endif

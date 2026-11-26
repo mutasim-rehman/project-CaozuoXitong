@@ -1,36 +1,22 @@
 # Mini CPU Scheduler - build everything with a single `make`.
 
-CC      = gcc
-CFLAGS  = -Wall -Wextra -pthread -O2 -std=c11
-LDFLAGS = -pthread
-LDLIBS  = -lrt
-
-SRC     = src
-OBJ     = build
-
-SCHED_OBJS  = $(OBJ)/common.o $(OBJ)/jobs.o $(OBJ)/sched.o $(OBJ)/output.o \
-              $(OBJ)/logger.o $(OBJ)/shm.o $(OBJ)/main.o
-REPORT_OBJS = $(OBJ)/common.o $(OBJ)/output.o $(OBJ)/report.o
+CXX      = g++
+CXXFLAGS = -Wall -Wextra -pthread -O2
+LDLIBS   = -lrt
 
 INPUTS  = inputs/jobs1.txt inputs/jobs2.txt inputs/jobs3.txt inputs/jobs4.txt \
-          inputs/starve.txt inputs/prio.txt
+          inputs/starve.txt
 QUANTUM = 2
 
-.PHONY: all clean run results csdemo agingdemo
+.PHONY: all clean run results starvedemo
 
 all: scheduler report
 
-scheduler: $(SCHED_OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+scheduler: src/scheduler.cpp src/logger.cpp src/common.h
+	$(CXX) $(CXXFLAGS) -o $@ src/scheduler.cpp src/logger.cpp $(LDLIBS)
 
-report: $(REPORT_OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-
-$(OBJ)/%.o: $(SRC)/%.c $(wildcard $(SRC)/*.h) | $(OBJ)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(OBJ):
-	mkdir -p $(OBJ)
+report: src/report.cpp src/common.h
+	$(CXX) $(CXXFLAGS) -o $@ src/report.cpp $(LDLIBS)
 
 run: all
 	./scheduler inputs/jobs1.txt rr $(QUANTUM)
@@ -44,19 +30,9 @@ results: all
 	done
 	@cat results.txt
 
-# Bonus: effect of a context-switch cost on the averages for different quanta.
-csdemo: all
-	@for q in 1 2 4; do for c in 0 1; do \
-		echo "=== quantum $$q, context-switch cost $$c ==="; \
-		./scheduler inputs/jobs4.txt all $$q --cs $$c --quiet | sed -n '/^Comparison (/,/^$$/p'; \
-	done; done
-
-# Bonus: priority scheduling with and without aging.
-agingdemo: all
-	@for a in 0 4; do \
-		echo "=== priority, aging $$a ==="; \
-		./scheduler inputs/prio.txt prio --aging $$a --quiet | sed -n '/^Gantt/,/^Context/p'; \
-	done
+# Bonus: starvation demo under SJF/SRTF vs FCFS.
+starvedemo: all
+	./scheduler inputs/starve.txt all $(QUANTUM) --quiet
 
 clean:
-	rm -rf $(OBJ) scheduler report schedule.log
+	rm -f scheduler report schedule.log
