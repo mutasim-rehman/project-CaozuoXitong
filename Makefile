@@ -5,10 +5,10 @@ CXXFLAGS = -Wall -Wextra -pthread -O2
 LDLIBS   = -lrt
 
 INPUTS  = inputs/jobs1.txt inputs/jobs2.txt inputs/jobs3.txt inputs/jobs4.txt \
-          inputs/starve.txt
+          inputs/starve.txt inputs/prio.txt
 QUANTUM = 2
 
-.PHONY: all clean run results starvedemo
+.PHONY: all clean run results starvedemo csdemo agingdemo
 
 all: scheduler report
 
@@ -33,6 +33,12 @@ results: all
 # Bonus: starvation demo under SJF/SRTF vs FCFS.
 starvedemo: all
 	./scheduler inputs/starve.txt all $(QUANTUM) --quiet
+
+csdemo: all
+	./scheduler inputs/jobs1.txt rr $(QUANTUM) --cs 1 --quiet
+
+agingdemo: all
+	./scheduler inputs/prio.txt prio --aging 2 --quiet
 
 clean:
 	rm -f scheduler report schedule.log

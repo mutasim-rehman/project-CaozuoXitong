@@ -13,7 +13,7 @@ using namespace std;
 const int MAX_JOBS   = 64;
 const int MAX_ID_LEN = 16;
 const int MAX_GANTT  = 4096;
-const int MAX_RUNS   = 4;
+const int MAX_RUNS   = 5;
 
 #ifndef TIME_UNIT_MS
 #define TIME_UNIT_MS 200   // 1 simulated time unit = 200 ms
@@ -27,6 +27,8 @@ struct Job {
     char id[MAX_ID_LEN];
     int  at;            // arrival time
     int  bt;            // burst time
+    int  priority;      // smaller value = higher priority
+    int  waited;        // ready-queue wait since last CPU turn
     int  rem;           // remaining time
     int  first_start;   // first time CPU was given (-1 if not started)
     int  ct;            // completion time
@@ -42,7 +44,7 @@ struct GanttEntry {
 // Plain structs (char arrays instead of std::string) so they fit in shared memory.
 struct JobMetric {
     char id[MAX_ID_LEN];
-    int  at, bt, ct, tat, wt, rt;
+    int  at, bt, priority, ct, tat, wt, rt;
 };
 
 struct RunResult {

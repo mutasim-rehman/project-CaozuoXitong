@@ -1,0 +1,5 @@
+# id arrival burst priority (smaller is higher)
+P1 0 4 3
+P2 0 2 2
+P3 1 2 2
+P4 2 2 2

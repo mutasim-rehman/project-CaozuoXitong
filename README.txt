@@ -17,9 +17,11 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
   make                     builds ./scheduler and ./report (g++ -Wall -Wextra -pthread)
   make clean               removes binaries and schedule.log
 
-  ./scheduler <input_file> <algorithm> [quantum] [--quiet]
-      algorithm : fcfs | sjf | srtf | rr | all
+  ./scheduler <input_file> <algorithm> [quantum] [--aging N] [--cs N] [--quiet]
+      algorithm : fcfs | sjf | srtf | rr | prio | all
       quantum   : required for rr and all
+      --aging N : improve a waiting job's priority by 1 every N units (prio)
+      --cs N    : charge N simulated units for each direct job switch
       --quiet   : hide the per-time-unit lines
 
   Examples:
@@ -27,11 +29,15 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
       ./scheduler inputs/jobs1.txt rr 2
       ./scheduler inputs/jobs1.txt all 2
       ./scheduler inputs/starve.txt all 2
+      ./scheduler inputs/prio.txt prio --aging 2
+      ./scheduler inputs/jobs1.txt rr 2 --cs 1
 
   Helper targets:
       make run         ./scheduler inputs/jobs1.txt rr 2
       make results     regenerates results.txt (all mode, every input file)
       make starvedemo  bonus: starvation demo on inputs/starve.txt
+      make agingdemo   priority scheduling with aging on inputs/prio.txt
+      make csdemo      Round Robin with context-switch cost
 
   One time unit = TIME_UNIT_MS = 200 ms (src/common.h). It can be changed
   at build time: make clean && make CXXFLAGS="-Wall -Wextra -pthread -DTIME_UNIT_MS=50"
@@ -116,7 +122,7 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
   - Idle CPU is shown as IDLE in the Gantt chart.
   - Context switch = CPU goes directly from one job to a different job.
     First dispatch and switches to/from IDLE are not counted.
-  - Input: "id arrival burst"; '#' lines and blank lines are ignored; file
+  - Input: "id arrival burst [priority]"; priority defaults to 0; '#' lines and blank lines are ignored; file
     need not be sorted. Bad inputs (missing/empty file, malformed line,
     negative arrival, burst < 1, duplicate id, more than 64 jobs) exit with
     a clear error message.

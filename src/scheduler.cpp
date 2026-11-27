@@ -5,6 +5,7 @@
 #define _DEFAULT_SOURCE
 #include "common.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <fcntl.h>
 #include <fstream>
@@ -26,6 +27,8 @@ int  rq_size  = 0;
 int  current_time = 0;
 bool verbose_mode = true;
 bool stop_threads = false;
+int aging_interval = 0;
+int switch_cost = 0;
 
 pthread_t arrival_tid;
 pthread_t job_tid[MAX_JOBS];
@@ -62,18 +65,27 @@ void load_jobs(string filename) {
             exit(1);
         }
 
-        int at, bt;
+        int at, bt, priority = 0;
         string extra;
-        if (!(iss >> at >> bt) || (iss >> extra && extra[0] != '#')) {
-            cerr << "error: line " << lineno << ": expected 'job_id arrival burst'\n";
+        if (!(iss >> at >> bt)) {
+            cerr << "error: line " << lineno << ": expected 'job_id arrival burst [priority]'\n";
             exit(1);
+        }
+        if (iss >> extra && extra[0] != '#') {
+            istringstream value(extra);
+            char trailing;
+            if (!(value >> priority) || (value >> trailing) ||
+                (iss >> extra && extra[0] != '#')) {
+                cerr << "error: line " << lineno << ": invalid priority\n";
+                exit(1);
+            }
         }
         if ((int)id.size() >= MAX_ID_LEN) {
             cerr << "error: line " << lineno << ": job id too long\n";
             exit(1);
         }
-        if (at < 0 || bt <= 0) {
-            cerr << "error: line " << lineno << ": arrival >= 0 and burst >= 1 required\n";
+        if (at < 0 || bt <= 0 || priority < 0) {
+            cerr << "error: line " << lineno << ": arrival >= 0, burst >= 1, priority >= 0 required\n";
             exit(1);
         }
         for (int i = 0; i < num_jobs; ++i) {
@@ -86,6 +98,7 @@ void load_jobs(string filename) {
         strcpy(jobs[num_jobs].id, id.c_str());
         jobs[num_jobs].at = at;
         jobs[num_jobs].bt = bt;
+        jobs[num_jobs].priority = priority;
         num_jobs++;
     }
 
@@ -113,6 +126,7 @@ void reset_jobs() {
         jobs[i].first_start = -1;
         jobs[i].ct          = -1;
         jobs[i].arrived     = false;
+        jobs[i].waited      = 0;
     }
 }
 
@@ -135,8 +149,10 @@ int pick_next_job(string algo) {
     for (int p = 1; p < rq_size; ++p) {
         Job b = jobs[ready_q[best]];
         Job c = jobs[ready_q[p]];
-        int key_b = (algo == "sjf") ? b.bt : b.rem;
-        int key_c = (algo == "sjf") ? c.bt : c.rem;
+        int key_b = (algo == "sjf") ? b.bt :
+                    (algo == "prio") ? max(0, b.priority - (aging_interval ? b.waited / aging_interval : 0)) : b.rem;
+        int key_c = (algo == "sjf") ? c.bt :
+                    (algo == "prio") ? max(0, c.priority - (aging_interval ? c.waited / aging_interval : 0)) : c.rem;
 
         // Smaller key wins; ties broken by earlier arrival, then smaller job id.
         if (key_c < key_b ||
@@ -170,6 +186,7 @@ string get_algo_label(string algo, int quantum) {
     if (algo == "fcfs") return "FCFS";
     if (algo == "sjf")  return "SJF";
     if (algo == "srtf") return "SRTF";
+    if (algo == "prio") return "Priority";
     return "Round Robin (q = " + to_string(quantum) + ")";
 }
 
@@ -244,7 +261,7 @@ void run_scheduler(string algo, int quantum, GanttEntry gantt[], int& g_count, R
 
         pthread_mutex_lock(&queue_mutex);
 
-        // Step 2: Check preemption (Round Robin quantum or SRTF shorter job).
+        // Step 2: Check preemption.
         if (running != -1) {
             if (algo == "rr" && q_used >= quantum) {
                 if (rq_size > 0) {
@@ -257,6 +274,17 @@ void run_scheduler(string algo, int quantum, GanttEntry gantt[], int& g_count, R
                 int best_pos = pick_next_job("srtf");
                 int best = ready_q[best_pos];
                 if (jobs[best].rem < jobs[running].rem) {
+                    log_event(current_time, "PREEMPTED", jobs[running].id);
+                    rq_remove(best_pos);
+                    rq_push(running);
+                    running = best;
+                }
+            } else if (algo == "prio" && rq_size > 0) {
+                int best_pos = pick_next_job("prio");
+                int best = ready_q[best_pos];
+                int effective = max(0, jobs[best].priority -
+                    (aging_interval ? jobs[best].waited / aging_interval : 0));
+                if (effective < jobs[running].priority) {
                     log_event(current_time, "PREEMPTED", jobs[running].id);
                     rq_remove(best_pos);
                     rq_push(running);
@@ -283,6 +311,18 @@ void run_scheduler(string algo, int quantum, GanttEntry gantt[], int& g_count, R
                 cout.flush();
                 pthread_mutex_unlock(&print_mutex);
             }
+            if (switch_cost > 0) {
+                log_event(current_time, "CONTEXT_SWITCH", jobs[running].id);
+                for (int i = 0; i < switch_cost; ++i) {
+                    append_gantt(gantt, g_count, current_time, "CS");
+                    for (int p = 0; p < rq_size; ++p) jobs[ready_q[p]].waited++;
+                    current_time++;
+                    usleep(TIME_UNIT_MS * 1000);
+                }
+                prev_job = -1; // charge this switch only once
+                pthread_mutex_unlock(&queue_mutex);
+                continue; // process arrivals after the overhead
+            }
         }
 
         // Step 5: Handle IDLE CPU.
@@ -294,6 +334,7 @@ void run_scheduler(string algo, int quantum, GanttEntry gantt[], int& g_count, R
                 pthread_mutex_unlock(&print_mutex);
             }
             append_gantt(gantt, g_count, current_time, "IDLE");
+            for (int p = 0; p < rq_size; ++p) jobs[ready_q[p]].waited++;
             current_time++;
             prev_job = -1;
             pthread_mutex_unlock(&queue_mutex);
@@ -303,6 +344,7 @@ void run_scheduler(string algo, int quantum, GanttEntry gantt[], int& g_count, R
 
         // Step 6: Log STARTED/RESUMED, update Gantt, and hand CPU to job thread.
         Job& j = jobs[running];
+        j.waited = 0;
         if (j.first_start == -1) {
             j.first_start = current_time;
             log_event(current_time, "STARTED", j.id);
@@ -318,6 +360,7 @@ void run_scheduler(string algo, int quantum, GanttEntry gantt[], int& g_count, R
         // Step 7: Update remaining time and completion state.
         pthread_mutex_lock(&queue_mutex);
         j.rem--;
+        for (int p = 0; p < rq_size; ++p) jobs[ready_q[p]].waited++;
         q_used++;
         current_time++;
         prev_job = running;
@@ -354,6 +397,7 @@ void run_scheduler(string algo, int quantum, GanttEntry gantt[], int& g_count, R
         strcpy(m.id, jobs[i].id);
         m.at  = jobs[i].at;
         m.bt  = jobs[i].bt;
+        m.priority = jobs[i].priority;
         m.ct  = jobs[i].ct;
         m.tat = m.ct - m.at;
         m.wt  = m.tat - m.bt;
@@ -417,7 +461,7 @@ GanttEntry gantt[MAX_GANTT];
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        cerr << "usage: " << argv[0] << " <input_file> <fcfs|sjf|srtf|rr|all> [quantum] [--quiet]\n";
+        cerr << "usage: " << argv[0] << " <input_file> <fcfs|sjf|srtf|rr|prio|all> [quantum] [--aging N] [--cs N] [--quiet]\n";
         return 1;
     }
 
@@ -428,15 +472,35 @@ int main(int argc, char* argv[]) {
     for (int i = 3; i < argc; ++i) {
         string arg = argv[i];
         if (arg == "--quiet") verbose_mode = false;
-        else quantum = atoi(arg.c_str());
+        else if ((arg == "--aging" || arg == "--cs") && i + 1 < argc) {
+            char* end;
+            long value = strtol(argv[++i], &end, 10);
+            if (*end || value < (arg == "--aging" ? 1 : 0) || value > 1000000) {
+                cerr << "error: invalid value for " << arg << "\n";
+                return 1;
+            }
+            if (arg == "--aging") aging_interval = (int)value;
+            else switch_cost = (int)value;
+        } else if (arg == "--aging" || arg == "--cs") {
+            cerr << "error: missing value for " << arg << "\n";
+            return 1;
+        } else {
+            char* end;
+            long value = strtol(arg.c_str(), &end, 10);
+            if (*end || value < 0 || value > 1000000) {
+                cerr << "error: unexpected argument '" << arg << "'\n";
+                return 1;
+            }
+            quantum = (int)value;
+        }
     }
 
     string list[MAX_RUNS];
     int    n_list = 0;
     if (algo == "all") {
-        list[0] = "fcfs"; list[1] = "sjf"; list[2] = "srtf"; list[3] = "rr";
-        n_list = 4;
-    } else if (algo == "fcfs" || algo == "sjf" || algo == "srtf" || algo == "rr") {
+        list[0] = "fcfs"; list[1] = "sjf"; list[2] = "srtf"; list[3] = "rr"; list[4] = "prio";
+        n_list = 5;
+    } else if (algo == "fcfs" || algo == "sjf" || algo == "srtf" || algo == "rr" || algo == "prio") {
         list[0] = algo;
         n_list = 1;
     } else {
