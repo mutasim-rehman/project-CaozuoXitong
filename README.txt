@@ -5,9 +5,9 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
 ----------------
   Name                    Roll number     Parts worked on
   ----------------------  --------------  ---------------------------------------
-  <Member 1 name>         <Roll no>       <e.g. Part 1, Part 3>
-  <Member 2 name>         <Roll no>       <e.g. Part 2, Part 4>
-  <Member 3 name>         <Roll no>       <e.g. Part 5, Part 6, bonus>
+  Hamza Faheem            24i-6034        initial design & implementation
+  Mutasim ur Rehman       24i-2514        code base optimization + bonus
+  Umar Behram             23i-2604        qa testing and scheduler 
 
   Group leader (submitter): <name>
 
