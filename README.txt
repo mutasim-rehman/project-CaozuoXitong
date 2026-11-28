@@ -9,18 +9,16 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
   Mutasim ur Rehman       24i-2514        code base optimization + bonus
   Umar Behram             23i-2604        qa testing and scheduler 
 
-  Group leader (submitter): <name>
-
-
 2. BUILD AND RUN
 ----------------
-  make                     builds ./scheduler and ./report (g++ -Wall -Wextra -pthread)
+  make                     builds ./scheduler and ./report (g++ -Wall -Wextra -pthread -O2)
   make clean               removes binaries and schedule.log
 
   ./scheduler <input_file> <algorithm> [quantum] [--aging N] [--cs N] [--quiet]
       algorithm : fcfs | sjf | srtf | rr | prio | all
       quantum   : required for rr and all
-      --aging N : improve a waiting job's priority by 1 every N units (prio)
+      --aging N : improve a ready job's effective priority by 1 every N
+                  waiting units (prio only; positive N)
       --cs N    : charge N simulated units for each direct job switch
       --quiet   : hide the per-time-unit lines
 
@@ -44,6 +42,7 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
 
   Each run writes the event log to schedule.log (overwritten per run) and,
   at the end, the separate report process prints the final report.
+  The 'all' option runs FCFS, SJF, SRTF, RR, and priority in that order.
 
 
 3. SOURCE FILES
@@ -68,13 +67,14 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
     1. Dispatcher posts `tick_sem`; arrival_thread enqueues every job with
        arrival <= t (logging ARRIVED), then posts `arrivals_done_sem`.
     2. Dispatcher (holding queue_mutex) applies the algorithm: preempt the
-       running job if needed (RR quantum expiry or SRTF shorter job), pick
+       running job if needed (RR quantum expiry, shorter SRTF job, or higher
+       effective priority), pick
        the next ready job if CPU is free, or record IDLE.
     3. Dispatcher posts `run_sem[i]`; job_thread i wakes, prints
        "[t=  3] P2 running   (remaining 2)", sleeps one time unit
        (usleep), and posts `done_sem`.
-    4. Dispatcher wakes from `sem_wait(done_sem)`, updates remaining time,
-       completion time, and context-switch count, then increments time.
+    4. Dispatcher wakes from `sem_wait(done_sem)`, updates remaining and
+       completion time, then increments time. Switches are counted at dispatch.
   Every job thread stays blocked on its own `run_sem[i]` at all other times,
   so only one job runs at a time.
 
@@ -120,12 +120,17 @@ MINI CPU SCHEDULER - Operating Systems Lab Project
   - SRTF: checked at every time unit; equal remaining time -> running job
     continues.
   - Idle CPU is shown as IDLE in the Gantt chart.
+  - Priority: smaller number wins. Ready jobs gain one effective priority
+    level per N waiting units with --aging N, down to 0. Their boost resets
+    when they run. Ties in the ready queue use arrival time, then job ID.
   - Context switch = CPU goes directly from one job to a different job.
-    First dispatch and switches to/from IDLE are not counted.
-  - Input: "id arrival burst [priority]"; priority defaults to 0; '#' lines and blank lines are ignored; file
-    need not be sorted. Bad inputs (missing/empty file, malformed line,
-    negative arrival, burst < 1, duplicate id, more than 64 jobs) exit with
-    a clear error message.
+    First dispatch and switches to/from IDLE are not counted. With --cs N,
+    each counted switch adds N time units shown as CS in the Gantt chart.
+    Arrivals during the overhead are processed after it completes.
+  - Input: "id arrival burst [priority]"; priority defaults to 0. Blank
+    lines and #-prefixed lines are ignored; files need not be sorted. Bad
+    inputs (missing/empty file, malformed line, negative arrival/priority,
+    burst < 1, duplicate ID, more than 64 jobs) exit with an error.
   - Response time = first CPU allocation - arrival.
 
 

@@ -1,0 +1,13 @@
+| `make run` | Builds the project, then runs Round Robin on `inputs/jobs1.txt` with quantum 2. |
+
+| `make results` | Builds the project, runs all five algorithms on each of the six sample inputs, and regenerates `results.txt` with comparison tables. |
+
+| `make starvedemo` | Runs all five algorithms on `inputs/starve.txt` with quantum 2 and `--quiet`, showing how short jobs can delay the long job. |
+
+| `make agingdemo` | Runs priority scheduling on `inputs/prio.txt` with aging every 2 waiting units and `--quiet`. |
+
+| `make csdemo` | Runs Round Robin on `inputs/jobs1.txt` with quantum 2 and a 1-unit cost per context switch. Uses `--quiet`. |
+
+| `make clean` | Removes the `scheduler` and `report` executables and `schedule.log`. It keeps `results.txt`. |
+
+| `make; ./scheduler inputs/jobs1.txt all 2 --quiet` | Builds, then runs all five algorithms on `jobs1.txt` with RR quantum 2. `--quiet` hides per-unit progress; Gantt charts, metrics, comparisons, and the final report still appear. |
